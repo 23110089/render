@@ -6,18 +6,10 @@ DEVICE="${TM_DEVICE:-idx}"
 
 echo "=== Starting Render Web Service with TraffMonetizer ==="
 
-# Tìm binary traffmonetizer
-TM_BIN=""
+# Binary đã được copy vào /usr/local/bin/traffmonetizer
+TM_BIN="/usr/local/bin/traffmonetizer"
 
-# 1) Kiểm tra /usr/local/bin (nơi Dockerfile copy vào)
-if [ -x "/usr/local/bin/traffmonetizer" ]; then
-  TM_BIN="/usr/local/bin/traffmonetizer"
-# 2) Tìm trong /tmroot
-elif [ -d "/tmroot" ]; then
-  TM_BIN=$(find /tmroot -type f \( -name "Tm" -o -name "traffmonetizer" \) 2>/dev/null | head -n1)
-fi
-
-if [ -n "$TM_BIN" ] && [ -x "$TM_BIN" ]; then
+if [ -x "$TM_BIN" ]; then
   echo "Found traffmonetizer binary at: $TM_BIN"
   
   # Chạy traffmonetizer background
@@ -28,9 +20,7 @@ if [ -n "$TM_BIN" ] && [ -x "$TM_BIN" ]; then
   # Lưu PID để cleanup
   echo "$TM_PID" > /tmp/tm.pid
 else
-  echo "WARNING: traffmonetizer binary không tìm thấy hoặc không thực thi được"
-  echo "Listing /tmroot:"
-  find /tmroot -type f 2>/dev/null | head -20 || true
+  echo "ERROR: traffmonetizer binary không tìm thấy tại $TM_BIN"
 fi
 
 # Forward signals để dừng sạch

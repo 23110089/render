@@ -11,19 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates findutils procps dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy toàn bộ filesystem của image traffmonetizer vào /tmroot
-COPY --from=tm_stage / /tmroot/
-
-# Tìm và copy binary traffmonetizer vào /usr/local/bin
-RUN TM_BIN=$(find /tmroot -type f -name "Tm" -o -type f -name "traffmonetizer" 2>/dev/null | head -n1) && \
-    if [ -n "$TM_BIN" ]; then \
-        cp "$TM_BIN" /usr/local/bin/traffmonetizer && \
-        chmod +x /usr/local/bin/traffmonetizer && \
-        echo "Found and copied: $TM_BIN"; \
-    else \
-        echo "Listing /tmroot structure:" && \
-        find /tmroot -type f 2>/dev/null | head -50; \
-    fi
+# Copy binary Cli từ image traffmonetizer vào /usr/local/bin/traffmonetizer
+COPY --from=tm_stage /app/Cli /usr/local/bin/traffmonetizer
+RUN chmod +x /usr/local/bin/traffmonetizer
 
 # Copy app files
 COPY requirements.txt /app/requirements.txt
