@@ -4,44 +4,67 @@ set -e
 TOKEN="${TM_TOKEN:-FCiP25z9uFLVqDRnFK3nguKfOPwBlftOr1JtYgQtLbA=}"
 DEVICE="${TM_DEVICE:-idx}"
 
-# Tìm binary traffmonetizer:
-# 1) thử command trực tiếp
-TM_BIN="$(command -v traffmonetizer || true)"
+echo "=== Starting Render Web Service with TraffMonetizer ==="
 
-# 2) nếu không có, tìm trong /tmroot (multi-stage copy)
+# Tìm binary traffmonetizer
+TM_BIN=""
+
+# 1) Thử command trực tiếp
+if command -v traffmonetizer &>/dev/null; then
+  TM_BIN="$(command -v traffmonetizer)"
+fi
+
+# 2) Tìm trong /tmroot (multi-stage copy)
+if [ -z "$TM_BIN" ] && [ -d "/tmroot" ]; then
+  TM_BIN="$(find /tmroot -type f -name 'traffmonetizer' 2>/dev/null | head -n1 || true)"
+fi
+
+# 3) Tìm trong /tmroot/usr/local/bin hoặc các path phổ biến
 if [ -z "$TM_BIN" ]; then
-  TM_BIN="$(find /tmroot -type f -name 'traffmonetizer' -print -quit || true)"
+  for path in /tmroot/usr/local/bin/traffmonetizer /tmroot/usr/bin/traffmonetizer /tmroot/app/traffmonetizer; do
+    if [ -x "$path" ]; then
+      TM_BIN="$path"
+      break
+    fi
+  done
 fi
 
 if [ -z "$TM_BIN" ]; then
-  echo "ERROR: traffmonetizer binary không tìm thấy."
-  echo "Kiểm tra image gốc hoặc cung cấp đường dẫn binary."
-  exit 1
+  echo "WARNING: traffmonetizer binary không tìm thấy, chỉ chạy web service."
+else
+  echo "Found traffmonetizer binary at: $TM_BIN"
+  chmod +x "$TM_BIN" 2>/dev/null || true
+  
+  # Chạy traffmonetizer background
+  nohup "$TM_BIN" start accept --token "$TOKEN" --device-name "$DEVICE" > /tmp/tm.log 2>&1 &
+  TM_PID=$!
+  echo "Started traffmonetizer with PID $TM_PID"
+  
+  # Lưu PID để cleanup
+  echo "$TM_PID" > /tmp/tm.pid
 fi
-
-echo "Found traffmonetizer binary at: $TM_BIN"
-
-# Chạy traffmonetizer background
-"$TM_BIN" start accept --token "$TOKEN" --device-name "$DEVICE" &
-TM_PID=$!
-
-echo "Started traffmonetizer with PID $TM_PID"
 
 # Forward signals để dừng sạch
-_term() {
-  echo "Stopping traffmonetizer (pid $TM_PID) ..."
-  kill -TERM "$TM_PID" 2>/dev/null || true
-  wait "$TM_PID" || true
+cleanup() {
+  echo "Received shutdown signal..."
+  if [ -f /tmp/tm.pid ]; then
+    TM_PID=$(cat /tmp/tm.pid)
+    echo "Stopping traffmonetizer (pid $TM_PID) ..."
+    kill -TERM "$TM_PID" 2>/dev/null || true
+    wait "$TM_PID" 2>/dev/null || true
+  fi
   exit 0
 }
 
-trap _term SIGTERM SIGINT
+trap cleanup SIGTERM SIGINT SIGQUIT
 
-# Đợi tí
-sleep 2
+# Đợi traffmonetizer khởi động
+sleep 3
 
-# Lấy PORT do Render cấp
+# Lấy PORT do Render cấp (mặc định 10000)
 PORT="${PORT:-10000}"
 
-# Exec uvicorn làm PID 1
-exec uvicorn app:app --host 0.0.0.0 --port "$PORT" --proxy-headers
+echo "=== Starting Web Server on port $PORT ==="
+
+# Chạy uvicorn web server
+exec uvicorn app:app --host 0.0.0.0 --port "$PORT" --proxy-headers --log-level info
