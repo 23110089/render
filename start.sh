@@ -1,20 +1,35 @@
 #!/bin/bash
 set -e
 
-# Token và device name lấy từ biến môi trường (set trên Render)
 TOKEN="${TM_TOKEN:-FCiP25z9uFLVqDRnFK3nguKfOPwBlftOr1JtYgQtLbA=}"
 DEVICE="${TM_DEVICE:-idx}"
 
-# Chạy traffmonetizer ở background, lưu PID
-# Giả sử lệnh 'traffmonetizer' có sẵn trong image traffmonetizer/cli_v2
-traffmonetizer start accept --token "$TOKEN" --device-name "$DEVICE" &
+# Tìm binary traffmonetizer:
+# 1) thử command trực tiếp
+TM_BIN="$(command -v traffmonetizer || true)"
+
+# 2) nếu không có, tìm trong /tmroot (multi-stage copy)
+if [ -z "$TM_BIN" ]; then
+  TM_BIN="$(find /tmroot -type f -name 'traffmonetizer' -print -quit || true)"
+fi
+
+if [ -z "$TM_BIN" ]; then
+  echo "ERROR: traffmonetizer binary không tìm thấy."
+  echo "Kiểm tra image gốc hoặc cung cấp đường dẫn binary."
+  exit 1
+fi
+
+echo "Found traffmonetizer binary at: $TM_BIN"
+
+# Chạy traffmonetizer background
+"$TM_BIN" start accept --token "$TOKEN" --device-name "$DEVICE" &
 TM_PID=$!
 
 echo "Started traffmonetizer with PID $TM_PID"
 
-# Khi nhận SIGTERM/SIGINT thì kill background process sạch
+# Forward signals để dừng sạch
 _term() {
-  echo "Received SIGTERM/SIGINT. Stopping traffmonetizer (pid $TM_PID) ..."
+  echo "Stopping traffmonetizer (pid $TM_PID) ..."
   kill -TERM "$TM_PID" 2>/dev/null || true
   wait "$TM_PID" || true
   exit 0
@@ -22,11 +37,11 @@ _term() {
 
 trap _term SIGTERM SIGINT
 
-# Đợi 2s cho chắc
+# Đợi tí
 sleep 2
 
-# Lấy PORT từ env (Render set $PORT)
+# Lấy PORT do Render cấp
 PORT="${PORT:-10000}"
 
-# exec uvicorn để nó trở thành PID 1 (nhận tín hiệu)
+# Exec uvicorn làm PID 1
 exec uvicorn app:app --host 0.0.0.0 --port "$PORT" --proxy-headers
