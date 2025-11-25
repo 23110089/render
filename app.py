@@ -1,14 +1,15 @@
 import os
 import subprocess
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 app = FastAPI(title="Render Web Service")
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
-    return {"status": "ok", "service": "render-webservice"}
+    return JSONResponse(content={"status": "ok", "service": "render-webservice"})
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     # Kiểm tra process traffmonetizer đang chạy không
     tm_running = False
@@ -22,10 +23,10 @@ def health():
     except Exception:
         pass
     
-    return {
+    return JSONResponse(content={
         "alive": True,
         "traffmonetizer_running": tm_running
-    }
+    })
 
 @app.get("/logs")
 def logs():

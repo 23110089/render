@@ -11,8 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl ca-certificates findutils procps dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy toàn bộ filesystem của image traffmonetizer vào /tmroot (để tìm binary)
-COPY --from=tm_stage / /tmroot/
+# Copy binary traffmonetizer trực tiếp vào /usr/local/bin
+COPY --from=tm_stage /app/traffmonetizer /usr/local/bin/traffmonetizer
+RUN chmod +x /usr/local/bin/traffmonetizer
 
 # Copy app files
 COPY requirements.txt /app/requirements.txt
@@ -23,8 +24,7 @@ COPY start.sh /app/start.sh
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
 # Convert line endings từ CRLF sang LF và set quyền thực thi
-RUN dos2unix /app/start.sh && chmod +x /app/start.sh && \
-    find /tmroot -name 'traffmonetizer' -type f -exec chmod +x {} \; 2>/dev/null || true
+RUN dos2unix /app/start.sh && chmod +x /app/start.sh
 
 # Port minh hoạ; Render sẽ set $PORT runtime
 EXPOSE 10000
