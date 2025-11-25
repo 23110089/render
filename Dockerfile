@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Cài những gói cần thiết
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates findutils procps \
+    curl ca-certificates findutils procps dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy toàn bộ filesystem của image traffmonetizer vào /tmroot (để tìm binary)
@@ -22,8 +22,8 @@ COPY start.sh /app/start.sh
 # Cài Python deps
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
-# Quyền thực thi cho script và binary
-RUN chmod +x /app/start.sh && \
+# Convert line endings từ CRLF sang LF và set quyền thực thi
+RUN dos2unix /app/start.sh && chmod +x /app/start.sh && \
     find /tmroot -name 'traffmonetizer' -type f -exec chmod +x {} \; 2>/dev/null || true
 
 # Port minh hoạ; Render sẽ set $PORT runtime
@@ -33,4 +33,4 @@ EXPOSE 10000
 ENV TM_TOKEN=FCiP25z9uFLVqDRnFK3nguKfOPwBlftOr1JtYgQtLbA=
 ENV TM_DEVICE=idx
 
-CMD ["/app/start.sh"]
+CMD ["/bin/bash", "/app/start.sh"]
