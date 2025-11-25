@@ -1,26 +1,31 @@
-# DÙNG IMAGE CHỨA TRAFFMONETIZER BÊN TRONG
-FROM traffmonetizer/cli_v2
+# Stage 1: lấy nội dung từ image traffmonetizer (chứa binary)
+FROM traffmonetizer/cli_v2 AS tm_stage
 
-# Cài Python nếu image base chưa có
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 python3-pip ca-certificates curl \
-    && rm -rf /var/lib/apt/lists/*
+# Stage 2: runtime python
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy mã nguồn
+# Cài những gói cần thiết
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates findutils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy toàn bộ filesystem của image traffmonetizer vào /tmroot (để tìm binary)
+COPY --from=tm_stage / /tmroot/
+
+# Copy app files
 COPY requirements.txt /app/requirements.txt
 COPY app.py /app/app.py
 COPY start.sh /app/start.sh
 
-# Cài python deps
+# Cài Python deps
 RUN pip3 install --no-cache-dir -r /app/requirements.txt
 
-# Quyền chạy
+# Quyền thực thi
 RUN chmod +x /app/start.sh
 
-# EXPOSE là minh hoạ; Render sẽ cung cấp $PORT runtime
+# Port minh hoạ; Render sẽ set $PORT runtime
 EXPOSE 10000
 
-# Chạy start script
 CMD ["/app/start.sh"]
